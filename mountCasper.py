@@ -23,9 +23,10 @@ mountTo = "%s/casper-rw"% (os.environ["HOME"])
 def foundCasperRw():
     listOfMounted = os.listdir("/media")
     for i in listOfMounted:
-        listOfI = os.listdir("/media/%s"% i)
-        if "casper-rw" in listOfI:
-            return "/media/%s/casper-rw"% i
+        if os.path.isdir("/media/%s"% i):
+            listOfI = os.listdir("/media/%s"% i)
+            if "casper-rw" in listOfI:
+                return "/media/%s/casper-rw"% i
     return False
 
 def mount():

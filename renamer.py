@@ -32,9 +32,7 @@ def getNewName(file):
     else:
         stat = os.stat(file)
         createDate = datetime.datetime.fromtimestamp(stat.st_mtime)
-    newName = createDate.isoformat()
-    newName = newName.replace("T"," ")
-    newName = newName.replace(":",".")
+    newName = createDate.strftime("%Y-%m-%d %H.%M.%S")
     newName = newName + "." + ext
     return newName
     
@@ -51,7 +49,7 @@ def renamer(directory):
                 if n == 0:
                     newName = name + "(" + str(n) + ")" + ext
                 else:
-                    newName = name[:-2] + str(n) + ")" + ext
+                    newName = name.split("(")[0] + "(" + str(n) + ")" + ext
                 n += 1
             os.rename(i, newName)
             print "%s renamed to %s"% (i, newName)

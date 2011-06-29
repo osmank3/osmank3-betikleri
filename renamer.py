@@ -27,7 +27,7 @@ import kaa.metadata as Meta
 def getNewName(file):
     ext = file.split(".")[-1].lower()
     info = Meta.parse(file)
-    if info.timestamp:
+    if info and info.timestamp:
         createDate = datetime.datetime.fromtimestamp(info.timestamp)
     else:
         stat = os.stat(file)

@@ -47,32 +47,34 @@ class Linker(object):
         self.userGid = i.pw_gid
         self.userDir = i.pw_dir
         self.UAD = os.path.join(self.userDir, AppDir, DistName)
+        self.statuses = {}
         self.blackList = BlackList[:]
         self.readUserBlackList()
         self.readLoginStatus()
                 
     def readUserBlackList(self):
-        os.chdir(os.path.join(self.userDir,AppDir))
-        if os.path.exists("blacklist"):
-            bLFile = open("blacklist", "r"):
-            bLLines = bLFile.readlines()
-            bLFile.close()
-            for i in bLLines:
-                if i[0] != "#":
-                    self.blackList.append(i.replace("\n","").strip())
+        if os.path.exists(os.path.join(self.userDir,AppDir)):
+            os.chdir(os.path.join(self.userDir,AppDir))
+            if os.path.exists("blacklist"):
+                bLFile = open("blacklist", "r")
+                bLLines = bLFile.readlines()
+                bLFile.close()
+                for i in bLLines:
+                    if i[0] != "#":
+                        self.blackList.append(i.replace("\n","").strip())
     
     def readLoginStatus(self):
-        os.chdir(os.path.join(self.userDir,AppDir))
-        if os.path.exists("status.tmp"):
-            statFile = open("status.tmp", "r")
-            statLines = statFile.readlines()
-            statFile.close()
-            self.statuses = {}
-            for i in statLines:
-                if i[0] != "#":
-                    key, value = i.split(":")
-                    self.statuses[key.strip()] = value.strip()
-    
+        if os.path.exists(os.path.join(self.userDir,AppDir)):
+            os.chdir(os.path.join(self.userDir,AppDir))
+            if os.path.exists("status.tmp"):
+                statFile = open("status.tmp", "r")
+                statLines = statFile.readlines()
+                statFile.close()
+                for i in statLines:
+                    if i[0] != "#":
+                        key, value = i.split(":")
+                        self.statuses[key.strip()] = value.strip()
+        
     def writeLoginStatus(self):
         os.chdir(os.path.join(self.userDir,AppDir))
         statFile = open("status.tmp", "w")
@@ -84,7 +86,7 @@ class Linker(object):
     def firstStart(self):
         # create an empty blacklist
         os.chdir(os.path.join(self.userDir,AppDir))
-        bLFile = open("blacklist", "w"):
+        bLFile = open("blacklist", "w")
         bLFile.write("# Add the names line by line to be blacklisted.\n#\n")
         bLFile.close()
         

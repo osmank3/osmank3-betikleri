@@ -46,7 +46,47 @@ class Linker(object):
         i = pwd.getpwuid(self.userId)
         self.userGid = i.pw_gid
         self.userDir = i.pw_dir
-        self.UAD = self.userDir + os.sep + AppDir + os.sep + DistName
+        self.UAD = os.path.join(self.userDir, AppDir, DistName)
+        self.blackList = BlackList[:]
+        self.readUserBlackList()
+        self.readLoginStatus()
+                
+    def readUserBlackList(self):
+        os.chdir(os.path.join(self.userDir,AppDir))
+        if os.path.exists("blacklist"):
+            bLFile = open("blacklist", "r"):
+            bLLines = bLFile.readlines()
+            bLFile.close()
+            for i in bLLines:
+                if i[0] != "#":
+                    self.blackList.append(i.replace("\n","").strip())
+    
+    def readLoginStatus(self):
+        os.chdir(os.path.join(self.userDir,AppDir))
+        if os.path.exists("status.tmp"):
+            statFile = open("status.tmp", "r")
+            statLines = statFile.readlines()
+            statFile.close()
+            self.statuses = {}
+            for i in statLines:
+                if i[0] != "#":
+                    key, value = i.split(":")
+                    self.statuses[key.strip()] = value.strip()
+    
+    def writeLoginStatus(self):
+        os.chdir(os.path.join(self.userDir,AppDir))
+        statFile = open("status.tmp", "w")
+        statFile.write("# This file generated automatically\n#\n# DO NOT EDIT/REMOVE THIS FILE\n#\n")
+        
+        statFile.write("DistName : %s\n"% DistName)
+        statFile.close()
+        
+    def firstStart(self):
+        # create an empty blacklist
+        os.chdir(os.path.join(self.userDir,AppDir))
+        bLFile = open("blacklist", "w"):
+        bLFile.write("# Add the names line by line to be blacklisted.\n#\n")
+        bLFile.close()
         
     def moveDirs(self):
         os.chdir(self.userDir)
@@ -54,6 +94,7 @@ class Linker(object):
         if not os.path.exists(AppDir):
             os.mkdir(AppDir)
             os.chown(AppDir, self.userId, self.userGid)
+            self.firstStart()
                 
         if not os.path.exists(self.UAD):
             os.mkdir(self.UAD)
@@ -66,7 +107,7 @@ class Linker(object):
         NeedMove = []
         
         for i in LastHomeList:
-            if i in BlackList:
+            if i in self.blackList:
                 pass
             elif i in OldHomeList and not os.path.islink(i):
                 NeedDelete.append(i)
@@ -105,21 +146,34 @@ class Linker(object):
             os.symlink(os.path.join(self.UAD, i), i)
             time.sleep(0.01)
             
+        self.writeStatusFile()
+            
     def unlink(self):
         os.chdir(self.userDir)
+        
+        if "DistName" in self.statuses.keys() and self.statuses["DistName"] != DistName:
+            os.chdir(AppDir)
+            if not os.path.exists(DistName):
+                os.rename(self.statuses["DistName"], DistName)
+            else:
+                print "I don't understand problem! Check the contents of the directory..."
+            os.chdir(self.userDir)
         
         self.moveDirs()
         
         HomeList = glob.glob(".*")
         
         for i in HomeList:
-            if i in BlackList:
+            if i in self.blackList:
                 pass
             elif os.path.islink(i):
                 os.unlink(i)
                 time.sleep(0.01)
             else:
                 print "Is this a bug?"
+        
+        if exists("%s/%s/status.tmp"% (self.userDir, AppDir)):
+            os.remove("%s/%s/status.tmp"% (self.userDir, AppDir))
 
 if __name__ == "__main__":
     usersIds = getUsersOnDist()

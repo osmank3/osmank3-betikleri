@@ -148,7 +148,7 @@ class Linker(object):
             os.symlink(os.path.join(self.UAD, i), i)
             time.sleep(0.01)
             
-        self.writeStatusFile()
+        self.writeLoginStatus()
             
     def unlink(self):
         os.chdir(self.userDir)
@@ -174,7 +174,7 @@ class Linker(object):
             else:
                 print "Is this a bug?"
         
-        if exists("%s/%s/status.tmp"% (self.userDir, AppDir)):
+        if os.path.exists("%s/%s/status.tmp"% (self.userDir, AppDir)):
             os.remove("%s/%s/status.tmp"% (self.userDir, AppDir))
 
 if __name__ == "__main__":

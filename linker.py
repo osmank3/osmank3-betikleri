@@ -138,7 +138,9 @@ class Linker(object):
         
         for i in HomeList:
             if os.path.exists(i):
-                if os.path.islink(i):
+                if i in self.blackList:
+                    pass
+                elif os.path.islink(i):
                     os.unlink(i)
                 elif os.path.isdir(i):
                     shutil.rmtree(i)

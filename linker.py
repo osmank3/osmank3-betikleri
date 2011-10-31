@@ -90,20 +90,25 @@ class Linker(object):
         bLFile.write("# Add the names line by line to be blacklisted.\n#\n")
         bLFile.close()
         
-    def moveDirs(self):
+    def moveDirs(self, OtherDist=None):
         os.chdir(self.userDir)
+        
+        if OtherDist:
+            UAD = os.path.join(self.userDir, AppDir, OtherDist)
+        else:
+            UAD = self.UAD
         
         if not os.path.exists(AppDir):
             os.mkdir(AppDir)
             os.chown(AppDir, self.userId, self.userGid)
             self.firstStart()
                 
-        if not os.path.exists(self.UAD):
-            os.mkdir(self.UAD)
-            os.chown(self.UAD, self.userId, self.userGid)
+        if not os.path.exists(UAD):
+            os.mkdir(UAD)
+            os.chown(UAD, self.userId, self.userGid)
         
         LastHomeList = glob.glob(".*")
-        OldHomeList = os.listdir(self.UAD)
+        OldHomeList = os.listdir(UAD)
         
         NeedDelete = []
         NeedMove = []
@@ -122,7 +127,7 @@ class Linker(object):
                 NeedDelete.append(i)
                 
         for i in NeedDelete:
-            os.chdir(self.UAD)
+            os.chdir(UAD)
             if os.path.isdir(i):
                 shutil.rmtree(i)
             else:
@@ -130,11 +135,17 @@ class Linker(object):
                 
         os.chdir(self.userDir)
         for i in NeedMove:
-            shutil.move(i, os.path.join(self.UAD, i))
+            shutil.move(i, os.path.join(UAD, i))
             
-    def link(self):
+    def link(self, way="link"):
         os.chdir(self.userDir)
         HomeList = os.listdir(self.UAD)
+        
+        if "DistName" in self.statuses.keys():
+            if self.statuses["DistName"] == DistName:
+                return
+            else:
+                self.unlink()
         
         for i in HomeList:
             if os.path.exists(i):
@@ -147,7 +158,10 @@ class Linker(object):
                 else:
                     os.remove(i)
                     
-            os.symlink(os.path.join(self.UAD, i), i)
+            if way == "link":
+                os.symlink(os.path.join(self.UAD, i), i)
+            if way == "move":
+                shutil.move(os.path.join(self.UAD, i), i)
             time.sleep(0.01)
             
         self.writeLoginStatus()
@@ -155,15 +169,17 @@ class Linker(object):
     def unlink(self):
         os.chdir(self.userDir)
         
+        OtherDist = None
+        
         if "DistName" in self.statuses.keys() and self.statuses["DistName"] != DistName:
             os.chdir(AppDir)
             if not os.path.exists(DistName):
                 os.rename(self.statuses["DistName"], DistName)
             else:
-                print "I don't understand problem! Check the contents of the directory..."
+                OtherDist = self.statuses["DistName"]
             os.chdir(self.userDir)
         
-        self.moveDirs()
+        self.moveDirs(OtherDist)
         
         HomeList = glob.glob(".*")
         
@@ -186,11 +202,14 @@ if __name__ == "__main__":
         for i in usersIds:
             userLink = Linker(i)
             if "start" in sys.argv:
-                userLink.link()
+                if "move" in sys.argv:
+                    userLink.link("move")
+                else:
+                    userLink.link()
                 print "User %s linked"% i
             elif "stop" in sys.argv:
                 userLink.unlink()
                 print "User %s unlinked"% i
     else:
-        print "Usage:\n linker.py start\n linker.py stop"
+        print "Usage:\n linker.py start \n linker.py stop\n linker.py start move        don't link, move"
         

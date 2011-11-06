@@ -17,7 +17,7 @@ reload(sys).setdefaultencoding("utf-8")
 
 AppDir = ".disthomelinker"
 
-BlackList = [AppDir, ".pulse", ".gvfs"]
+BlackList = [AppDir]
 
 try:
     releaseFile = open("/etc/lsb-release", "r")
@@ -137,7 +137,7 @@ class Linker(object):
         for i in NeedMove:
             shutil.move(i, os.path.join(UAD, i))
             
-    def link(self, way="link"):
+    def link(self, way="move"):
         os.chdir(self.userDir)
         HomeList = os.listdir(self.UAD)
         
@@ -198,18 +198,31 @@ class Linker(object):
 if __name__ == "__main__":
     usersIds = getUsersOnDist()
     
-    if "start" or "stop" in sys.argv:
+    if len( set(["start","stop"]) & set(sys.argv) ) != 1:
+        print """\
+Usage:
+ linker.py [command] [options]
+ 
+ command:
+    start       prepare users's home directories for using
+    stop        clean users's home directories for shutdown
+ 
+ options:
+    start options:
+      move      don't link configuration files/folders, move them (default)
+      link      don't move configuration files/folders, link them\n"""
+    
+    else:
         for i in usersIds:
             userLink = Linker(i)
             if "start" in sys.argv:
                 if "move" in sys.argv:
                     userLink.link("move")
+                elif "link" in sys.argv:
+                    userLink.link("link")
                 else:
                     userLink.link()
                 print "User %s linked"% i
             elif "stop" in sys.argv:
                 userLink.unlink()
                 print "User %s unlinked"% i
-    else:
-        print "Usage:\n linker.py start \n linker.py stop\n linker.py start move        don't link, move"
-        

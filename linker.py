@@ -11,13 +11,16 @@ import glob
 import shutil
 import pwd
 import time
+import datetime
 
 #For using unicode utf-8
 reload(sys).setdefaultencoding("utf-8")
 
 AppDir = ".disthomelinker"
+LogAddress = "/var/log/linker.log"
 
 BlackList = [AppDir]
+UserBlackList = []
 
 try:
     releaseFile = open("/etc/lsb-release", "r")
@@ -35,10 +38,15 @@ def getUsersOnDist():
     usersIds = []
     allUsers = pwd.getpwall()
     for i in allUsers:
-        if "/home/" in i.pw_dir and os.path.isdir(i.pw_dir):
+        if "/home/" in i.pw_dir and os.path.isdir(i.pw_dir) and i.pw_name not in UserBlackList:
             usersIds.append(i.pw_uid)
             
     return usersIds
+    
+def writeLog(logText):
+    logFile = open(LogAddress, "a")
+    logFile.write("[%s] -- %s\n"% (datetime.datetime.now(), logText))
+    logFile.close()
     
 class Linker(object):
     def __init__(self, userid=None):
@@ -82,6 +90,7 @@ class Linker(object):
         
         statFile.write("DistName : %s\n"% DistName)
         statFile.close()
+        writeLog("%s/%s/status.tmp created"% (self.userDir, AppDir))
         
     def firstStart(self):
         # create an empty blacklist
@@ -143,6 +152,7 @@ class Linker(object):
         
         if "DistName" in self.statuses.keys():
             if self.statuses["DistName"] == DistName:
+                writeLog("%s wasn't closed normaly, Linker passing linking"% DistName)
                 return
             else:
                 self.unlink()
@@ -157,6 +167,7 @@ class Linker(object):
                     shutil.rmtree(i)
                 else:
                     os.remove(i)
+                writeLog("'%s' is overwrited."% i)
                     
             if way == "link":
                 os.symlink(os.path.join(self.UAD, i), i)
@@ -175,8 +186,10 @@ class Linker(object):
             os.chdir(AppDir)
             if not os.path.exists(DistName):
                 os.rename(self.statuses["DistName"], DistName)
+                writeLog("Distro's name changed.")
             else:
                 OtherDist = self.statuses["DistName"]
+                writeLog("%s wasn't closed normaly, Linker backing up it"% OtherDist)
             os.chdir(self.userDir)
         
         self.moveDirs(OtherDist)
@@ -190,10 +203,11 @@ class Linker(object):
                 os.unlink(i)
                 time.sleep(0.01)
             else:
-                print "Is this a bug?"
+                writeLog("Is this a bug? %s"% i)
         
         if os.path.exists("%s/%s/status.tmp"% (self.userDir, AppDir)):
             os.remove("%s/%s/status.tmp"% (self.userDir, AppDir))
+            writeLog("%s/%s/status.tmp deleted"% (self.userDir, AppDir))
 
 if __name__ == "__main__":
     usersIds = getUsersOnDist()
@@ -216,13 +230,15 @@ Usage:
         for i in usersIds:
             userLink = Linker(i)
             if "start" in sys.argv:
+                writeLog("Linker is started linking")
                 if "move" in sys.argv:
                     userLink.link("move")
                 elif "link" in sys.argv:
                     userLink.link("link")
                 else:
                     userLink.link()
-                print "User %s linked"% i
+                writeLog("User %s linked"% i)
             elif "stop" in sys.argv:
+                writeLog("Linker is started unlinking")
                 userLink.unlink()
-                print "User %s unlinked"% i
+                writeLog("User %s unlinked"% i)

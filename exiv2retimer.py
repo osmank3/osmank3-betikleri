@@ -17,6 +17,8 @@
 #     -p --plus           increase time DEFAULT
 #     -m --minus          decrease time
 #     -n --name           change file name to create time
+#     -r --recursive      do everything recursively
+#     -o --only-images    change only image files
 #     --day DAY           how many days to change
 #     --hour HOUR         how many hours to change
 #     --minute MINUTE     how many minutes to change
@@ -42,28 +44,36 @@ MINUTE = 0
 SECOND = 0
 ISPLUS = True
 RENAME = False
+RECURSIVE = False
+ONLYIMAGE = False
 
 def setNewTime(editFile):
-    meta = pyexiv2.ImageMetadata(editFile)
-    meta.read()
     keys = ["Exif.Image.DateTime",
             "Exif.Photo.DateTimeOriginal",
             "Exif.Photo.DateTimeDigitized",
             "Exif.Thumbnail.DateTime"]
-    
-    if "Exif.Photo.DateTimeOriginal" in meta.keys():
-        isExif = True
-        createDate = meta["Exif.Photo.DateTimeOriginal"].value
-    elif "Exif.Photo.DateTimeDigitized" in meta.keys():
-        isExif = True
-        createDate = meta["Exif.Photo.DateTimeDigitized"].value
-    elif "Exif.Image.DateTime" in meta.keys():
-        isExif = True
-        createDate = meta["Exif.Image.DateTime"].value
-    else:
+    meta = pyexiv2.ImageMetadata(editFile)
+    try:
+        meta.read()
+        if "Exif.Photo.DateTimeOriginal" in meta.keys():
+            isExif = True
+            createDate = meta["Exif.Photo.DateTimeOriginal"].value
+        elif "Exif.Photo.DateTimeDigitized" in meta.keys():
+            isExif = True
+            createDate = meta["Exif.Photo.DateTimeDigitized"].value
+        elif "Exif.Image.DateTime" in meta.keys():
+            isExif = True
+            createDate = meta["Exif.Image.DateTime"].value
+        else:
+            isExif = False
+    except IOError:
         isExif = False
-        stat = os.stat(file)
-        createDate = datetime.datetime.fromtimestamp(stat.st_ctime)
+        if ONLYIMAGE:
+            return 0
+    
+    if not isExif:
+        stat = os.stat(editFile)
+        createDate = datetime.datetime.fromtimestamp(stat.st_mtime)
        
     delta = datetime.timedelta(days=DAY, hours=HOUR, minutes=MINUTE, seconds=SECOND)
     if ISPLUS:
@@ -76,7 +86,8 @@ def setNewTime(editFile):
             meta[key] = pyexiv2.ExifTag(key, newDate)
         
         meta.write()
-        print("%s is retimed."% editFile)
+        if delta != datetime.timedelta(seconds=0): #images time tags are same now
+            print("%s is retimed."% editFile)
     
     if RENAME:
         ext = editFile.split(".")[-1].lower()
@@ -94,15 +105,18 @@ def setNewTime(editFile):
         print("%s renamed to %s"% (editFile, newName))
 
 def retimer(dirorfile):
-    if os.path.isdir(dirorfile):
+    if os.path.isfile(dirorfile):
+        setNewTime(dirorfile)
+    elif os.path.isdir(dirorfile):
         os.chdir(dirorfile)
         listOfDir = os.listdir("./")
         listOfDir.sort()
         for i in listOfDir:
-            retimer(i)
+            if os.path.isfile(i):
+                setNewTime(i)
+            elif os.path.isdir(i) and RECURSIVE:
+                retimer(i)
         os.chdir("..")
-    elif os.path.isfile(dirorfile):
-        setNewTime(dirorfile)
         
 def usage(returnArg=0):
     msg = "Usage: exiv2retimer.py [OPTIONS] file or directory\n"
@@ -110,6 +124,8 @@ def usage(returnArg=0):
     msg += "-p --plus           increase time DEFAULT\n"
     msg += "-m --minus          decrease time\n"
     msg += "-n --name           change file name to create time\n"
+    msg += "-r --recursive      do everything recursively\n"
+    msg += "-o --only-images    change only image files\n"
     msg += "--day DAY           how many days to change\n"
     msg += "--hour HOUR         how many hours to change\n"
     msg += "--minute MINUTE     how many minutes to change\n"
@@ -120,7 +136,10 @@ def usage(returnArg=0):
         
 if __name__ == "__main__":
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hpmn", ["help", "day=", "hour=", "minute=", "second=", "plus", "minus", "name"])
+        opts, args = getopt.getopt( sys.argv[1:], "hpmnro",
+                                    ["help", "day=", "hour=", "minute=",
+                                    "second=", "plus", "minus", "name",
+                                    "recursive", "only-images"])
     except getopt.GetoptError:
         usage(2)
     if args == []:
@@ -135,6 +154,10 @@ if __name__ == "__main__":
             ISPLUS = True
         if o in ("-n", "--name"):
             RENAME = True
+        if o in ("-r", "--recursive"):
+            RECURSIVE = True
+        if o in ("-o", "--only-images"):
+            ONLYIMAGE = True
         if o in ("--day"):
             DAY = int(a)
         if o in ("--hour"):

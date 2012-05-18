@@ -91,7 +91,7 @@ def setNewTime(editFile):
     
     if RENAME:
         ext = editFile.split(".")[-1].lower()
-        newName = createDate.strftime("%Y-%m-%d %H.%M.%S")
+        newName = newDate.strftime("%Y-%m-%d %H.%M.%S")
         newName = newName + "." + ext
         n = 0
         while os.path.isfile(newName):

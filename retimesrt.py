@@ -13,6 +13,7 @@
 # Options:
 #     -p --plus           increase time DEFAULT
 #     -m --minus          decrease time
+#     -o --overwrite      overwrite original file\n
 #     --minute MINUTE     how many minutes to change
 #     --second SECOND     how many seconds to change
 #     --microsec MICROSEC how many micro seconds to change
@@ -34,14 +35,15 @@ MINUTES = 0
 SECONDS = 0
 MICROSEC = 000000
 ISPLUS = True
+OVERWRITE = False
 
 def SetNewTime(TimeText):
     timesstext = TimeText.split(" --> ")
     newtimesstext = []
     for i in timesstext:
-        sure, salise = i.split(",")
-        saat, dakika, saniye = sure.split(":")
-        oldtime = datetime.datetime(1,1,1,int(saat),int(dakika),int(saniye),int(salise)*1000)
+        time, microsec = i.split(",")
+        hour, minute, second = time.split(":")
+        oldtime = datetime.datetime(1,1,1,int(hour),int(minute),int(second),int(microsec)*1000)
         
         delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
         
@@ -59,36 +61,42 @@ def SetNewTime(TimeText):
     
     return(" --> ".join(newtimesstext))
     
-def editFile(dosya):
-    subtitle = open(dosya, "r")
+def editFile(subfile):
+    subtitle = open(subfile, "r")
     lines = subtitle.readlines()
-    ceviriler = [[]]
+    subtitle.close()
+    transLines = [[]]
     for i in lines:
         if i == "\r\n" or i == "\n":
             lineEnd = i
-            ceviriler.append([])
+            transLines.append([])
         else:
-            ceviriler[-1].append(i)
+            transLines[-1].append(i)
             
-    for i in ceviriler:
+    for i in transLines:
         if len(i) > 0:
             newtime = SetNewTime(i[1].replace("\r\n",""))
             i[1] = newtime + "\r\n"
         
-    newsub = open("%s.new.srt"% dosya[:-4], "w")
-    for i in ceviriler:
+    if OVERWRITE:
+        newFileName = subfile
+    else:
+        newFileName = "%s.new.srt"% subfile[:-4]
+    newsub = open(newFileName, "w")
+    for i in transLines:
         for j in i:
             newsub.write(j)
         newsub.write(lineEnd)
         
     newsub.close()
-    print("%s.new.srt is created"% dosya[:-4])
+    print("%s is prepared"% newFileName)
 
 def usage(returnArg=0):
     msg = "Usage: retimesrt.py [OPTIONS] file\n"
     msg += "Increase or decrease time of srt file.\n\nOptions:\n"
     msg += "-p --plus           increase time DEFAULT\n"
     msg += "-m --minus          decrease time\n"
+    msg += "-o --overwrite      overwrite original file\n"
     msg += "--minute MINUTE     how many minutes to change\n"
     msg += "--second SECOND     how many seconds to change\n"
     msg += "--microsec MICROSEC how many micro seconds to change\n"
@@ -98,7 +106,7 @@ def usage(returnArg=0):
     
 if __name__ == "__main__":
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hpm", ["help", "minute=", "second=", "microsec=", "plus", "minus"])
+        opts, args = getopt.getopt(sys.argv[1:], "hpmo", ["help", "minute=", "second=", "microsec=", "plus", "minus", "overwrite"])
     except getopt.GetoptError:
         usage(2)
     if args == []:
@@ -111,6 +119,8 @@ if __name__ == "__main__":
             ISPLUS = False
         if o in ("-p", "--plus"):
             ISPLUS = True
+        if o in ("-o", "--overwrite"):
+            OVERWRITE = True
         if o in ("--minute") and o not in ("-m"):
             MINUTES = int(a)
         if o in ("--second"):

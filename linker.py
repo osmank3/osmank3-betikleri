@@ -3,7 +3,7 @@
 #
 # Author: Osman Karagöz
 # Licensed under the GNU General Public License, version 3.
-# See the file http://www.gnu.org/copyleft/gpl.txt.
+# See the file http://www.gnu.org/copyleft/gpl.txt
 
 import os
 import sys
@@ -12,15 +12,18 @@ import shutil
 import pwd
 import time
 import datetime
+import tarfile
 
-#For using unicode utf-8
-reload(sys).setdefaultencoding("utf-8")
+#For using unicode utf-8 on python2
+if sys.version_info.major < 3:
+    reload(sys).setdefaultencoding("utf-8")
 
 AppDir = ".disthomelinker"
 LogAddress = "/var/log/linker.log"
 
 BlackList = [AppDir]
 UserBlackList = []
+BackupOnAllStop = False
 
 try:
     releaseFile = open("/etc/lsb-release", "r")
@@ -34,19 +37,24 @@ try:
 except:
     DistName = 0
 
-def getUsersOnDist():
+def getUsersOnDist(username=None):
     usersIds = []
     allUsers = pwd.getpwall()
     for i in allUsers:
         if "/home/" in i.pw_dir and os.path.isdir(i.pw_dir) and i.pw_name not in UserBlackList:
+            if username and i.pw_name == username:
+                return i.pw_uid
             usersIds.append(i.pw_uid)
             
     return usersIds
     
 def writeLog(logText):
-    logFile = open(LogAddress, "a")
-    logFile.write("[%s] -- %s\n"% (datetime.datetime.now(), logText))
-    logFile.close()
+    try:
+        logFile = open(LogAddress, "a")
+        logFile.write("[%s] -- %s\n"% (datetime.datetime.now(), logText))
+        logFile.close()
+    except IOError:
+        print(logText)
     
 class Linker(object):
     def __init__(self, userid=None):
@@ -58,7 +66,7 @@ class Linker(object):
         self.statuses = {}
         self.blackList = BlackList[:]
         self.readUserBlackList()
-        self.readLoginStatus()
+        self.readStatusFile()
                 
     def readUserBlackList(self):
         if os.path.exists(os.path.join(self.userDir,AppDir)):
@@ -71,7 +79,7 @@ class Linker(object):
                     if i[0] != "#":
                         self.blackList.append(i.replace("\n","").strip())
     
-    def readLoginStatus(self):
+    def readStatusFile(self):
         if os.path.exists(os.path.join(self.userDir,AppDir)):
             os.chdir(os.path.join(self.userDir,AppDir))
             if os.path.exists("status.tmp"):
@@ -81,16 +89,28 @@ class Linker(object):
                 for i in statLines:
                     if i[0] != "#":
                         key, value = i.split(":")
-                        self.statuses[key.strip()] = value.strip()
+                        if value.strip().lower() == "true":
+                            value = True
+                        elif value.strip().lower() == "false":
+                            value = False
+                        else:
+                            value = value.strip()
+                        self.statuses[key.strip()] = value
         
-    def writeLoginStatus(self):
+    def writeStatusFile(self):
         os.chdir(os.path.join(self.userDir,AppDir))
         statFile = open("status.tmp", "w")
         statFile.write("# This file generated automatically\n#\n# DO NOT EDIT/REMOVE THIS FILE\n#\n")
         
-        statFile.write("DistName : %s\n"% DistName)
+        for i in self.statuses.keys():
+            statFile.write("%s : %s\n"% (i, self.statuses[i]))
         statFile.close()
-        writeLog("%s/%s/status.tmp created"% (self.userDir, AppDir))
+        os.chown("status.tmp", self.userId, self.userGid)
+        writeLog("%s/%s/status.tmp created/updated"% (self.userDir, AppDir))
+    
+    def appendBackupStatus(self, Stat=True):
+        self.statuses["BackupOnStop"] = Stat
+        self.writeStatusFile()
         
     def firstStart(self):
         # create an empty blacklist
@@ -98,6 +118,14 @@ class Linker(object):
         bLFile = open("blacklist", "w")
         bLFile.write("# Add the names line by line to be blacklisted.\n#\n")
         bLFile.close()
+        
+    def backup(self):
+        writeLog("Backuping is started")
+        backupFile = tarfile.open(self.UAD + ".tar", "w")
+        backupFile.add(self.UAD, DistName)
+        backupFile.close()
+        os.chown(self.UAD + ".tar", self.userId, self.userGid)
+        writeLog("Backup completed")
         
     def moveDirs(self, OtherDist=None):
         os.chdir(self.userDir)
@@ -175,7 +203,8 @@ class Linker(object):
                 shutil.move(os.path.join(self.UAD, i), i)
             time.sleep(0.01)
             
-        self.writeLoginStatus()
+        self.statuses["DistName"] = DistName
+        self.writeStatusFile()
             
     def unlink(self):
         os.chdir(self.userDir)
@@ -208,37 +237,92 @@ class Linker(object):
         if os.path.exists("%s/%s/status.tmp"% (self.userDir, AppDir)):
             os.remove("%s/%s/status.tmp"% (self.userDir, AppDir))
             writeLog("%s/%s/status.tmp deleted"% (self.userDir, AppDir))
+        
+        if BackupOnAllStop or ("BackupOnStop" in self.statuses and self.statuses["BackupOnStop"]):
+            self.backup()
+
+def usage(returnArg=0):
+    msg = "Usage: linker.py [COMMAND] [OPTIONS]\n\n"
+    msg += "Commands:\n"
+    msg += "  start                 prepare users's home directories for using\n"
+    msg += "  stop                  clean users's home directories for shutdown\n"
+    msg += "  backup USERNAME       backup user files on shutdown\n"
+    msg += "  no-backup USERNAME    don't backup user files on shutdown\n"
+    msg += "  -h --help             print this help\n\n"
+    msg += "Options:\n"
+    msg += "  start:\n"
+    msg += "    move                use moving for preparing (default)\n"
+    msg += "    link                use linking for preparing\n"
+    print(msg)
+    sys.exit(returnArg)
 
 if __name__ == "__main__":
     usersIds = getUsersOnDist()
     
-    if len( set(["start","stop"]) & set(sys.argv) ) != 1:
-        print """\
-Usage:
- linker.py [command] [options]
- 
- command:
-    start       prepare users's home directories for using
-    stop        clean users's home directories for shutdown
- 
- options:
-    start options:
-      move      don't link configuration files/folders, move them (default)
-      link      don't move configuration files/folders, link them\n"""
+    command = None
+    options = None
     
-    else:
-        for i in usersIds:
-            userLink = Linker(i)
-            if "start" in sys.argv:
-                writeLog("Linker is started linking")
-                if "move" in sys.argv:
-                    userLink.link("move")
-                elif "link" in sys.argv:
-                    userLink.link("link")
+    argv = sys.argv[1:]
+    if len(argv) > 0:
+        command = argv[0]
+    if len(argv) > 1:
+        options = argv[1:]
+    
+    if not command:
+        usage(2)
+    
+    for i in usersIds:
+        userLink = Linker(i)
+        if command in ("-h", "--help"):
+            usage(0)
+        
+        elif command == "start":
+            if os.getuid() != 0:
+                writeLog("Only root user can run this command")
+                sys.exit(2)
+            writeLog("Linker is started linking")
+            if not options:
+                userLink.link("move")
+            elif "move" in options:
+                userLink.link("move")
+            elif "link" in options:
+                userLink.link("link")
+            else:
+                usage(2)
+            writeLog("User %s linked"% i)
+        
+        elif command == "stop":
+            if os.getuid() != 0:
+                writeLog("Only root user can run this command")
+                sys.exit(2)
+            writeLog("Linker is started unlinking")
+            userLink.unlink()
+            writeLog("User %s unlinked"% i)
+        
+        elif command in ("no-backup", "backup"):
+            if not options:
+                if i == os.getuid():
+                    isThisUser = True
                 else:
-                    userLink.link()
-                writeLog("User %s linked"% i)
-            elif "stop" in sys.argv:
-                writeLog("Linker is started unlinking")
-                userLink.unlink()
-                writeLog("User %s unlinked"% i)
+                    isThisUser = False
+            else:
+                userid = getUsersOnDist(options[0])
+                if type(userid) == int and i == userid:
+                    if i == os.getuid() or os.getuid() == 0:
+                        isThisUser = True
+                    else:
+                        isThisUser = False
+                        writeLog("Only root user can change other users status")
+                else:
+                    isThisUser = False
+            if isThisUser:
+                if command == "backup":
+                    userLink.appendBackupStatus(True)
+                    writeLog("User files will backup on shutdown.")
+                elif command == "no-backup":
+                    userLink.appendBackupStatus(False)
+                    writeLog("User files won't be able to backup on shutdown.")
+        
+        else:
+            usage(2)
+

@@ -13,14 +13,17 @@
 # Options:
 #     -p --plus           increase time DEFAULT
 #     -m --minus          decrease time
-#     -o --overwrite      overwrite original file\n
+#     -o --overwrite      overwrite original file
 #     --minute MINUTE     how many minutes to change
 #     --second SECOND     how many seconds to change
 #     --microsec MICROSEC how many micro seconds to change
+#     --aftertime TIME    change file after time, TIME = h:m:s or m:s
+#     --beforetime TIME   change file before time, TIME = h:m:s or m:s
 #
 # Example:
 #     python retimesrt.py -p --minute 15 file
 #     python retimesrt.py -m --second 25 file
+#     python retimesrt.py -p --second 6 --aftertime 1:12:30 file
 
 import os
 import sys
@@ -36,6 +39,8 @@ SECONDS = 0
 MICROSEC = 000000
 ISPLUS = True
 OVERWRITE = False
+ABTIME = datetime.datetime(1,1,1)
+ABSTAT = None
 
 def SetNewTime(TimeText):
     timesstext = TimeText.split(" --> ")
@@ -45,7 +50,10 @@ def SetNewTime(TimeText):
         hour, minute, second = time.split(":")
         oldtime = datetime.datetime(1,1,1,int(hour),int(minute),int(second),int(microsec)*1000)
         
-        delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
+        if  (ABSTAT == "after" and oldtime < ABTIME) or (ABSTAT == "before" and oldtime > ABTIME):
+            delta = datetime.timedelta()
+        else:
+            delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
         
         if ISPLUS:
             newtime = oldtime + delta
@@ -100,13 +108,18 @@ def usage(returnArg=0):
     msg += "--minute MINUTE     how many minutes to change\n"
     msg += "--second SECOND     how many seconds to change\n"
     msg += "--microsec MICROSEC how many micro seconds to change\n"
+    msg += "--aftertime TIME    change file after time, TIME = h:m:s or m:s\n"
+    msg += "--beforetime TIME   change file before time, TIME = h:m:s or m:s\n"
     msg += "-h --help           print this help\n"
     print(msg)
     sys.exit(returnArg)
     
 if __name__ == "__main__":
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hpmo", ["help", "minute=", "second=", "microsec=", "plus", "minus", "overwrite"])
+        opts, args = getopt.getopt( sys.argv[1:], "hpmo",
+                                    ["help", "minute=", "second=", "microsec=",
+                                    "plus", "minus", "overwrite", "aftertime=",
+                                    "beforetime="])
     except getopt.GetoptError:
         usage(2)
     if args == []:
@@ -132,5 +145,24 @@ if __name__ == "__main__":
                 MICROSEC = int(a)
             else:
                 pass
-            
+        if o in ("--aftertime", "--beforetime"):
+            if o == "--aftertime":
+                ABSTAT = "after"
+            if o == "--beforetime":
+                ABSTAT = "before"
+            time = a.split(":")
+            if len(time) == 3:
+                hour, minute, second = time
+                second = int(second)
+                minute = int(minute)
+                minute += int(hour) * 60
+            elif len(time) == 2:
+                minute, second = time
+                second = int(second)
+                minute = int(minute)
+            else:
+                usage(2)
+            delta = datetime.timedelta(minutes=minute, seconds=second)
+            ABTIME += delta
+    
     editFile(" ".join(args))

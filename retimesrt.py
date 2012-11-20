@@ -39,8 +39,10 @@ SECONDS = 0
 MICROSEC = 000000
 ISPLUS = True
 OVERWRITE = False
-ABTIME = datetime.datetime(1,1,1)
-ABSTAT = None
+ATIME = datetime.datetime(1,1,1)
+ASTAT = False
+BTIME = datetime.datetime(1,1,1)
+BSTAT = False
 
 def SetNewTime(TimeText):
     timesstext = TimeText.split(" --> ")
@@ -50,8 +52,23 @@ def SetNewTime(TimeText):
         hour, minute, second = time.split(":")
         oldtime = datetime.datetime(1,1,1,int(hour),int(minute),int(second),int(microsec)*1000)
         
-        if  (ABSTAT == "after" and oldtime < ABTIME) or (ABSTAT == "before" and oldtime > ABTIME):
-            delta = datetime.timedelta()
+        if ASTAT and BSTAT:
+            if ATIME < BTIME:
+                if ATIME < oldtime < BTIME:
+                    delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
+                else:
+                    delta = datetime.timedelta()
+            elif BTIME < ATIME:
+                if BTIME < oldtime < ATIME:
+                    delta = datetime.timedelta()
+                else:
+                    delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
+            elif BTIME == ATIME:
+                delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
+        elif ASTAT and ATIME < oldtime:
+            delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
+        elif BSTAT and oldtime < BTIME:
+            delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
         else:
             delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
         
@@ -99,7 +116,7 @@ def editFile(subfile):
     newsub.close()
     print("%s is prepared"% newFileName)
 
-def usage(returnArg=0):
+def usage(returnArg=0, detail=False):
     msg = "Usage: retimesrt.py [OPTIONS] file\n"
     msg += "Increase or decrease time of srt file.\n\nOptions:\n"
     msg += "-p --plus           increase time DEFAULT\n"
@@ -110,24 +127,36 @@ def usage(returnArg=0):
     msg += "--microsec MICROSEC how many micro seconds to change\n"
     msg += "--aftertime TIME    change file after time, TIME = h:m:s or m:s\n"
     msg += "--beforetime TIME   change file before time, TIME = h:m:s or m:s\n"
-    msg += "-h --help           print this help\n"
+    msg += "-u --usage          print detailed usage of aftertime and beforetime\n"
+    msg += "-h --help           print this help\n\nExamples:\n"
+    msg += "  retimesrt.py -p --minute 15 file\n"
+    msg += "  retimesrt.py -m --second 25 file\n"
+    msg += "  retimesrt.py -p --second 6 --aftertime 1:12:30 file\n"
+    if detail == True:
+        msg += "\nDetailed Usage:\n"
+        msg += "  --aftertime TIME => A\n  --beforetime TIME => B\n  changing 'x' times\n"
+        msg += "    A only    ------Axxxxx\n"
+        msg += "    B only    xxxxxB------\n"
+        msg += "    A<B       ---AxxxxB---\n"
+        msg += "    A>B       xxxB----Axxx\n"
+        msg += "    A=B       xxxxxABxxxxx\n"
     print(msg)
     sys.exit(returnArg)
     
 if __name__ == "__main__":
     try:
-        opts, args = getopt.getopt( sys.argv[1:], "hpmo",
+        opts, args = getopt.getopt( sys.argv[1:], "hpmou",
                                     ["help", "minute=", "second=", "microsec=",
                                     "plus", "minus", "overwrite", "aftertime=",
-                                    "beforetime="])
+                                    "beforetime=", "usage"])
     except getopt.GetoptError:
-        usage(2)
-    if args == []:
         usage(2)
         
     for o, a in opts:
         if o in ("-h", "--help"):
             usage(0)
+        if o in ("-u", "--usage"):
+            usage(0, True)
         if o in ("-m", "--minus"):
             ISPLUS = False
         if o in ("-p", "--plus"):
@@ -147,9 +176,9 @@ if __name__ == "__main__":
                 pass
         if o in ("--aftertime", "--beforetime"):
             if o == "--aftertime":
-                ABSTAT = "after"
+                ASTAT = True
             if o == "--beforetime":
-                ABSTAT = "before"
+                BSTAT = True
             time = a.split(":")
             if len(time) == 3:
                 hour, minute, second = time
@@ -163,6 +192,12 @@ if __name__ == "__main__":
             else:
                 usage(2)
             delta = datetime.timedelta(minutes=minute, seconds=second)
-            ABTIME += delta
+            if o == "--aftertime":
+                ATIME += delta
+            if o == "--beforetime":
+                BTIME += delta
+    
+    if args == []:
+        usage(2)
     
     editFile(" ".join(args))

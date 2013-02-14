@@ -15,15 +15,15 @@ import datetime
 import tarfile
 
 #For using unicode utf-8 on python2
-if sys.version_info.major < 3:
+if sys.version_info[0] < 3:
     reload(sys).setdefaultencoding("utf-8")
 
-AppDir = ".disthomelinker"
-LogAddress = "/var/log/linker.log"
+AppDir = ".disthome"
+LogAddress = "/var/log/prephome.log"
 
 BlackList = [AppDir]
 UserBlackList = []
-BackupOnAllStop = False
+ArchiveOnAllStop = False
 
 try:
     releaseFile = open("/etc/lsb-release", "r")
@@ -56,7 +56,7 @@ def writeLog(logText):
     except IOError:
         print(logText)
     
-class Linker(object):
+class Preparer(object):
     def __init__(self, userid=None):
         self.userId = userid
         i = pwd.getpwuid(self.userId)
@@ -108,8 +108,8 @@ class Linker(object):
         os.chown("status.tmp", self.userId, self.userGid)
         writeLog("%s/%s/status.tmp created/updated"% (self.userDir, AppDir))
     
-    def appendBackupStatus(self, Stat=True):
-        self.statuses["BackupOnStop"] = Stat
+    def appendArchiveStatus(self, Stat=True):
+        self.statuses["ArchiveOnStop"] = Stat
         self.writeStatusFile()
         
     def firstStart(self):
@@ -119,13 +119,13 @@ class Linker(object):
         bLFile.write("# Add the names line by line to be blacklisted.\n#\n")
         bLFile.close()
         
-    def backup(self):
-        writeLog("Backuping is started")
-        backupFile = tarfile.open(self.UAD + ".tar", "w")
-        backupFile.add(self.UAD, DistName)
-        backupFile.close()
+    def archive(self):
+        writeLog("Archiving is started")
+        archiveFile = tarfile.open(self.UAD + ".tar", "w")
+        archiveFile.add(self.UAD, DistName)
+        archiveFile.close()
         os.chown(self.UAD + ".tar", self.userId, self.userGid)
-        writeLog("Backup completed")
+        writeLog("Archiving completed")
         
     def moveDirs(self, OtherDist=None):
         os.chdir(self.userDir)
@@ -180,7 +180,7 @@ class Linker(object):
         
         if "DistName" in self.statuses.keys():
             if self.statuses["DistName"] == DistName:
-                writeLog("%s wasn't closed normaly, Linker passing linking"% DistName)
+                writeLog("%s wasn't closed normaly, PrepHome passing preparing"% DistName)
                 return
             else:
                 self.unlink()
@@ -218,7 +218,7 @@ class Linker(object):
                 writeLog("Distro's name changed.")
             else:
                 OtherDist = self.statuses["DistName"]
-                writeLog("%s wasn't closed normaly, Linker backing up it"% OtherDist)
+                writeLog("%s wasn't closed normaly, PrepHome backing up it"% OtherDist)
             os.chdir(self.userDir)
         
         self.moveDirs(OtherDist)
@@ -238,16 +238,16 @@ class Linker(object):
             os.remove("%s/%s/status.tmp"% (self.userDir, AppDir))
             writeLog("%s/%s/status.tmp deleted"% (self.userDir, AppDir))
         
-        if BackupOnAllStop or ("BackupOnStop" in self.statuses and self.statuses["BackupOnStop"]):
-            self.backup()
+        if ArchiveOnAllStop or ("ArchiveOnStop" in self.statuses and self.statuses["ArchiveOnStop"]):
+            self.archive()
 
 def usage(returnArg=0):
-    msg = "Usage: linker.py [COMMAND] [OPTIONS]\n\n"
+    msg = "Usage: prephome [COMMAND] [OPTIONS]\n\n"
     msg += "Commands:\n"
     msg += "  start                 prepare users's home directories for using\n"
-    msg += "  stop                  clean users's home directories for shutdown\n"
-    msg += "  backup USERNAME       backup user files on shutdown\n"
-    msg += "  no-backup USERNAME    don't backup user files on shutdown\n"
+    msg += "  stop                  backup users's home directories for shutdown\n"
+    msg += "  archive USERNAME      archive user files on shutdown\n"
+    msg += "  no-archive USERNAME   don't archive user files on shutdown\n"
     msg += "  -h --help             print this help\n\n"
     msg += "Options:\n"
     msg += "  start:\n"
@@ -272,7 +272,7 @@ if __name__ == "__main__":
         usage(2)
     
     for i in usersIds:
-        userLink = Linker(i)
+        userPrep = Preparer(i)
         if command in ("-h", "--help"):
             usage(0)
         
@@ -280,26 +280,26 @@ if __name__ == "__main__":
             if os.getuid() != 0:
                 writeLog("Only root user can run this command")
                 sys.exit(2)
-            writeLog("Linker is started linking")
+            writeLog("Prephome is preparing users home")
             if not options:
-                userLink.link("move")
+                userPrep.link("move")
             elif "move" in options:
-                userLink.link("move")
+                userPrep.link("move")
             elif "link" in options:
-                userLink.link("link")
+                userPrep.link("link")
             else:
                 usage(2)
-            writeLog("User %s linked"% i)
+            writeLog("User %s prepared"% i)
         
         elif command == "stop":
             if os.getuid() != 0:
                 writeLog("Only root user can run this command")
                 sys.exit(2)
-            writeLog("Linker is started unlinking")
-            userLink.unlink()
-            writeLog("User %s unlinked"% i)
+            writeLog("Prephome is backing up users home")
+            userPrep.unlink()
+            writeLog("User %s backed up"% i)
         
-        elif command in ("no-backup", "backup"):
+        elif command in ("no-archive", "archive"):
             if not options:
                 if i == os.getuid():
                     isThisUser = True
@@ -316,12 +316,12 @@ if __name__ == "__main__":
                 else:
                     isThisUser = False
             if isThisUser:
-                if command == "backup":
-                    userLink.appendBackupStatus(True)
-                    writeLog("User files will backup on shutdown.")
-                elif command == "no-backup":
-                    userLink.appendBackupStatus(False)
-                    writeLog("User files won't be able to backup on shutdown.")
+                if command == "archive":
+                    userPrep.appendArchiveStatus(True)
+                    writeLog("User files will archive on shutdown.")
+                elif command == "no-archive":
+                    userPrep.appendArchiveStatus(False)
+                    writeLog("User files won't be able to archive on shutdown.")
         
         else:
             usage(2)

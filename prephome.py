@@ -32,7 +32,7 @@ try:
     
     for i in releaseLines:
         if "DISTRIB_DESCRIPTION" in i:
-            DistName = i.split("=")[1].replace('"',"").replace("\n","")
+            DistName = i.split("=")[1].replace('"',"").replace("\n","").replace("/", "")
 
 except:
     DistName = 0

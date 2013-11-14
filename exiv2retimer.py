@@ -19,6 +19,7 @@
 #     -n --name           change file name to create time
 #     -r --recursive      do everything recursively
 #     -o --only-images    change only image files
+#     -a --archive [YMD]  move images to (Y)ear/(M)ount/(D)ay directory
 #     --day DAY           how many days to change
 #     --hour HOUR         how many hours to change
 #     --minute MINUTE     how many minutes to change
@@ -27,16 +28,21 @@
 # Example:
 #     python exiv2retimer.py -pn --hour 2 --minute 15 file
 #     python exiv2retimer.py -m --day 1 --second 25 directory
+#     python exiv2retimer.py -n -a YM directory
 
 import os
 import sys
 import getopt
+import locale
 import datetime
 import pyexiv2
 
 #For using unicode utf-8
 if sys.version_info.major < 3:
     reload(sys).setdefaultencoding("utf-8")
+
+#For using locales full mount name
+locale.setlocale(locale.LC_ALL, locale.getdefaultlocale())
 
 DAY = 0
 HOUR = 0
@@ -46,6 +52,9 @@ ISPLUS = True
 RENAME = False
 RECURSIVE = False
 ONLYIMAGE = False
+ARC_YEAR = False
+ARC_MOUNT = False
+ARC_DAY = False
 
 def setNewTime(editFile):
     keys = ["Exif.Image.DateTime",
@@ -103,6 +112,21 @@ def setNewTime(editFile):
             n += 1
         os.rename(editFile, newName)
         print("%s renamed to %s"% (editFile, newName))
+        editFile = newName
+    
+    if ARC_YEAR or ARC_MOUNT or ARC_DAY:
+        new_dir = ""
+        if ARC_YEAR:
+            new_dir += newDate.strftime("%Y") + "/"
+        if ARC_MOUNT:
+            new_dir += newDate.strftime("%B") + "/"
+        if ARC_DAY:
+            new_dir += newDate.strftime("%d") + "/"
+        if new_dir != "":
+            if not os.path.isdir(new_dir):
+                os.makedirs(new_dir)
+            os.rename(editFile, new_dir + editFile)
+            print("%s moved to %s"% (editFile, new_dir + editFile))
 
 def retimer(dirorfile):
     if os.path.isfile(dirorfile):
@@ -126,6 +150,7 @@ def usage(returnArg=0):
     msg += "-n --name           change file name to create time\n"
     msg += "-r --recursive      do everything recursively\n"
     msg += "-o --only-images    change only image files\n"
+    msg += "-a --archive [YMD]  move images to (Y)ear/(M)ount/(D)ay directory\n"
     msg += "--day DAY           how many days to change\n"
     msg += "--hour HOUR         how many hours to change\n"
     msg += "--minute MINUTE     how many minutes to change\n"
@@ -136,10 +161,10 @@ def usage(returnArg=0):
         
 if __name__ == "__main__":
     try:
-        opts, args = getopt.getopt( sys.argv[1:], "hpmnro",
+        opts, args = getopt.getopt( sys.argv[1:], "hpmnroa:",
                                     ["help", "day=", "hour=", "minute=",
                                     "second=", "plus", "minus", "name",
-                                    "recursive", "only-images"])
+                                    "recursive", "only-images", "archive="])
     except getopt.GetoptError:
         usage(2)
     if args == []:
@@ -158,6 +183,13 @@ if __name__ == "__main__":
             RECURSIVE = True
         if o in ("-o", "--only-images"):
             ONLYIMAGE = True
+        if o in ("-a", "--archive"):
+            if "Y" in a:
+                ARC_YEAR = True
+            if "M" in a:
+                ARC_MOUNT = True
+            if "D" in a:
+                ARC_DAY = True
         if o in ("--day"):
             DAY = int(a)
         if o in ("--hour"):

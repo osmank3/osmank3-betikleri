@@ -89,39 +89,44 @@ def setNewTime(editFile):
         for key in keys:
             meta.set_tag_string(key, newDate.strftime("%Y:%m:%d %H:%M:%S"))
         
-        meta.save_file(editFile)
-        if delta != datetime.timedelta(seconds=0): #images time tags are same now
-            print("%s is retimed."% editFile)
+        try:
+            meta.save_file(editFile)
+            if delta != datetime.timedelta(seconds=0): #images time tags are same now
+                print("%s is retimed."% editFile)
+        except:
+            print("%s files Exif data could not changed"% editFile)
     
-    if RENAME:
-        ext = editFile.split(".")[-1].lower()
-        newName = newDate.strftime("%Y-%m-%d %H.%M.%S")
-        newName = newName + "." + ext
-        n = 0
-        while os.path.isfile(newName):
-            name, ext = os.path.splitext(newName)
-            if n == 0:
-                newName = name + "(" + str(n) + ")" + ext
-            else:
-                newName = name.split("(")[0] + "(" + str(n) + ")" + ext
-            n += 1
-        os.rename(editFile, newName)
-        print("%s renamed to %s"% (editFile, newName))
-        editFile = newName
-    
-    if ARC_YEAR or ARC_MOUNT or ARC_DAY:
-        new_dir = ""
+    if ARC_YEAR or ARC_MOUNT or ARC_DAY or RENAME:
+        newDir = ""
+        newName = editFile
         if ARC_YEAR:
-            new_dir += newDate.strftime("%Y") + "/"
+            newDir += newDate.strftime("%Y") + "/"
         if ARC_MOUNT:
-            new_dir += newDate.strftime("%B") + "/"
+            newDir += newDate.strftime("%B") + "/"
         if ARC_DAY:
-            new_dir += newDate.strftime("%d") + "/"
-        if new_dir != "":
-            if not os.path.isdir(new_dir):
-                os.makedirs(new_dir)
-            os.rename(editFile, new_dir + editFile)
-            print("%s moved to %s"% (editFile, new_dir + editFile))
+            newDir += newDate.strftime("%d") + "/"
+        if RENAME:
+            ext = editFile.split(".")[-1].lower()
+            newName = newDate.strftime("%Y-%m-%d %H.%M.%S")
+            newName = newName + "." + ext
+        if newDir != "" or newName != editFile:
+            if not os.path.isdir(newDir) and newDir != "":
+                os.makedirs(newDir)
+            newName = newDir + newName
+            n = 0
+            while os.path.isfile(newName):
+                name, ext = os.path.splitext(newName)
+                if n == 0:
+                    newName = name + "(" + str(n) + ")" + ext
+                else:
+                    newName = name.split("(")[0] + "(" + str(n) + ")" + ext
+                n += 1
+            
+            os.rename(editFile, newName)
+            if newDir != "":
+                print("%s moved to %s"% (editFile, newName))
+            else:
+                print("%s renamed to %s"% (editFile, newName))
 
 def retimer(dirorfile):
     if os.path.isfile(dirorfile):

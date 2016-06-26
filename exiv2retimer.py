@@ -96,7 +96,10 @@ def setNewTime(editFile):
         
         meta.write()
         if delta != datetime.timedelta(seconds=0): #images time tags are same now
-            print("%s is retimed."% editFile)
+            print("%s files Exif data is retimed."% editFile)
+    
+    os.utime(editFile, (newDate.timestamp(), newDate.timestamp()))
+    print("%s is retimed."% editFile)
     
     if ARC_YEAR or ARC_MOUNT or ARC_DAY or RENAME:
         newDir = ""

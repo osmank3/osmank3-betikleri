@@ -35,6 +35,9 @@ import sys
 import getopt
 import datetime
 import locale
+
+from gi import require_version
+require_version('GExiv2', '0.10')
 from gi.repository import GExiv2
 
 #For using unicode utf-8
@@ -69,7 +72,10 @@ def setNewTime(editFile):
             isExif = True
             for data in keys:
                 if meta.get_tag_string(data) != "":
-                    createDate = datetime.datetime.strptime(meta.get_tag_string(data), "%Y:%m:%d %H:%M:%S")
+                    createDate = datetime.datetime.strptime(
+                        meta.get_tag_string(data),
+                        "%Y:%m:%d %H:%M:%S"
+                        )
                     break
     except:
         if ONLYIMAGE:
@@ -78,24 +84,31 @@ def setNewTime(editFile):
         if not isExif:
             stat = os.stat(editFile)
             createDate = datetime.datetime.fromtimestamp(stat.st_mtime)
-        
-    delta = datetime.timedelta(days=DAY, hours=HOUR, minutes=MINUTE, seconds=SECOND)
+
+    delta = datetime.timedelta(days=DAY,
+                               hours=HOUR,
+                               minutes=MINUTE,
+                               seconds=SECOND
+                               )
     if ISPLUS:
         newDate = createDate + delta
     else:
         newDate = createDate - delta
-    
+
     if isExif:
         for key in keys:
             meta.set_tag_string(key, newDate.strftime("%Y:%m:%d %H:%M:%S"))
-        
+
         try:
             meta.save_file(editFile)
             if delta != datetime.timedelta(seconds=0): #images time tags are same now
-                print("%s is retimed."% editFile)
+                print("%s files Exif data is retimed."% editFile)
         except:
             print("%s files Exif data could not changed"% editFile)
     
+    os.utime(editFile, (newDate.timestamp(), newDate.timestamp()))
+    print("%s is retimed."% editFile)
+
     if ARC_YEAR or ARC_MOUNT or ARC_DAY or RENAME:
         newDir = ""
         newName = editFile
@@ -121,7 +134,7 @@ def setNewTime(editFile):
                 else:
                     newName = name.split("(")[0] + "(" + str(n) + ")" + ext
                 n += 1
-            
+
             os.rename(editFile, newName)
             if newDir != "":
                 print("%s moved to %s"% (editFile, newName))
@@ -141,7 +154,7 @@ def retimer(dirorfile):
             elif os.path.isdir(i) and RECURSIVE:
                 retimer(i)
         os.chdir("..")
-        
+
 def usage(returnArg=0):
     msg = "Usage: gexiv2retimer.py [OPTIONS] file or directory\n"
     msg += "Increase or decrease exif time.\n\nOptions:\n"
@@ -158,7 +171,7 @@ def usage(returnArg=0):
     msg += "-h --help           print this help\n"
     print(msg)
     sys.exit(returnArg)
-        
+
 if __name__ == "__main__":
     try:
         opts, args = getopt.getopt( sys.argv[1:], "hpmnroa:",
@@ -169,7 +182,7 @@ if __name__ == "__main__":
         usage(2)
     if args == []:
         usage(2)
-        
+
     for o, a in opts:
         if o in ("-h", "--help"):
             usage(0)
@@ -198,5 +211,5 @@ if __name__ == "__main__":
             MINUTE = int(a)
         if o in ("--second"):
             SECOND = int(a)
-            
+
     retimer(" ".join(args))

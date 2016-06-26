@@ -65,10 +65,11 @@ def SetNewTime(TimeText):
                     delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
             elif BTIME == ATIME:
                 delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
-        elif ASTAT and ATIME < oldtime:
-            delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
-        elif BSTAT and oldtime < BTIME:
-            delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
+        elif ASTAT or BSTAT:
+            if (ASTAT and ATIME < oldtime) or (BSTAT and oldtime < BTIME):
+                delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
+            else:
+                delta = datetime.timedelta()
         else:
             delta = datetime.timedelta(minutes=MINUTES, seconds=SECONDS,microseconds=MICROSEC)
         

@@ -9,7 +9,7 @@
 # See the file http://www.gnu.org/copyleft/gpl.txt
 #
 # Usage:
-# /bin/bash disk_sync.sh /source/path
+# /bin/bash disk_sync.sh "/source/path" [--exclude="dir1"] [--exclude="dir2"]
 #
 # Config file parameters:
 #
@@ -44,14 +44,18 @@ source "$config_file"
 # Check if source directory is provided as argument
 if [ $# -eq 0 ]; then
   echo "ERROR: Source directory is not provided as argument"
+  echo "Usage: $0 <source_dir> [additional_rsync_args...]"
   exit 1
 fi
 
-# Combine all arguments into a single string
-SOURCE_DIR="$*"
+# Take first argument for source. Attention: if path has space, use quotation marks
+SOURCE_DIR="$1"
 
 # Remove leading and trailing quotes if present
 SOURCE_DIR=$(echo "$SOURCE_DIR" | sed -e 's/^"//' -e 's/"$//')
+
+# Remove first argument
+shift
 
 # Check if source directory starts with mount point
 if [[ "$SOURCE_DIR" == "$MOUNT_POINT"* ]]; then
@@ -116,7 +120,7 @@ log_message "Synchronizing: $SOURCE_DIR -> $DEST_DIR"
 
 # Synchronize directories (with backup of deleted files)
 sync_error=0
-if rsync -av --delete --backup --backup-dir="$BACKUP_DIRECTORY" "$SOURCE_DIR/" "$DEST_DIR/"; then
+if rsync -av --delete --backup --backup-dir="$BACKUP_DIRECTORY" "$@" "$SOURCE_DIR/" "$DEST_DIR/"; then
   log_message "Directories synchronized (deleted files backed up): $SOURCE_DIR -> $DEST_DIR"
 else
   log_message "ERROR: Failed to synchronize directories: $SOURCE_DIR -> $DEST_DIR"
